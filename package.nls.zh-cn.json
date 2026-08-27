@@ -1,0 +1,12 @@
+{
+	"displayName": "转换编码",
+	"description": "带编码探测的磁盘级批量编码转换器——无需打开文件，即可在任意编码间批量转换文件或整个文件夹。",
+	"command.convert.title": "转换编码",
+	"command.convertWithOptions.title": "转换编码（选择编码）…",
+	"config.sourceEncoding": "一键转换命令使用的源编码：'auto' 表示逐文件自动探测（BOM → 严格 UTF-8 校验 → 排序候选并经无损解码验证）；也可填显式编码 ID（如 gbk）。显式指定会跳过二进制嗅探，但仍严格校验。",
+	"config.targetEncoding": "一键转换命令使用的目标编码。接受任意 iconv-lite 编码 ID；规范 ID（utf-8、utf-8-bom、utf-16le、utf-16be）完全决定 BOM 行为。",
+	"config.onUnmappable": "目标编码无法表示某字符时的处理：fail 拒绝该文件不写盘；replace 替换为 '?' 并警告。",
+	"config.batchExcludes": "文件夹递归转换时排除的 glob 模式（相对于扫描目录）。",
+	"config.maxFileSizeMB": "超过此大小的文件将被跳过。0 表示不限制。",
+	"config.detectionConfidenceThreshold": "auto 模式下接受探测结果所需的最低置信度（0–100）。"
+}

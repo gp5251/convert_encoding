@@ -1,0 +1,126 @@
+{
+	"name": "convert-encoding",
+	"displayName": "%displayName%",
+	"description": "%description%",
+	"version": "0.2.0",
+	"publisher": "changeencoding",
+	"engines": {
+		"vscode": "^1.80.0"
+	},
+	"categories": [
+		"Other"
+	],
+	"main": "./dist/extension.js",
+	"contributes": {
+		"commands": [
+			{
+				"command": "convertEncoding.convert",
+				"title": "%command.convert.title%"
+			},
+			{
+				"command": "convertEncoding.convertWithOptions",
+				"title": "%command.convertWithOptions.title%"
+			}
+		],
+		"menus": {
+			"explorer/context": [
+				{
+					"command": "convertEncoding.convert",
+					"when": "view == workbench.explorer.fileView",
+					"group": "1_modification@90"
+				},
+				{
+					"command": "convertEncoding.convertWithOptions",
+					"when": "view == workbench.explorer.fileView",
+					"group": "1_modification@91"
+				}
+			],
+			"editor/context": [
+				{
+					"command": "convertEncoding.convert",
+					"group": "9_cutcopypaste@98"
+				},
+				{
+					"command": "convertEncoding.convertWithOptions",
+					"group": "9_cutcopypaste@99"
+				}
+			],
+			"editor/title": [
+				{
+					"command": "convertEncoding.convert"
+				}
+			]
+		},
+		"configuration": {
+			"title": "Convert Encoding",
+			"properties": {
+				"convertEncoding.sourceEncoding": {
+					"type": "string",
+					"default": "auto",
+					"markdownDescription": "%config.sourceEncoding%"
+				},
+				"convertEncoding.targetEncoding": {
+					"type": "string",
+					"default": "utf-8",
+					"markdownDescription": "%config.targetEncoding%"
+				},
+				"convertEncoding.onUnmappable": {
+					"type": "string",
+					"enum": [
+						"fail",
+						"replace"
+					],
+					"default": "fail",
+					"markdownDescription": "%config.onUnmappable%"
+				},
+				"convertEncoding.batchExcludes": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"default": [
+						"**/node_modules/**",
+						"**/.git/**",
+						"**/.svn/**",
+						"**/.hg/**"
+					],
+					"markdownDescription": "%config.batchExcludes%"
+				},
+				"convertEncoding.maxFileSizeMB": {
+					"type": "number",
+					"default": 20,
+					"minimum": 0,
+					"markdownDescription": "%config.maxFileSizeMB%"
+				},
+				"convertEncoding.detectionConfidenceThreshold": {
+					"type": "number",
+					"default": 90,
+					"minimum": 0,
+					"maximum": 100,
+					"markdownDescription": "%config.detectionConfidenceThreshold%"
+				}
+			}
+		}
+	},
+	"scripts": {
+		"vscode:prepublish": "node esbuild.js --production",
+		"build": "node esbuild.js",
+		"watch": "node esbuild.js --watch",
+		"typecheck": "tsc --noEmit",
+		"test": "node --import tsx --test \"src/test/**/*.test.ts\"",
+		"package": "vsce package --allow-missing-repository --baseContentUrl . --baseImagesUrl ."
+	},
+	"dependencies": {
+		"chardet": "^2.2.0",
+		"iconv-lite": "^0.7.0",
+		"minimatch": "^9.0.5"
+	},
+	"devDependencies": {
+		"@types/node": "^20.14.0",
+		"@types/vscode": "1.80.0",
+		"@vscode/vsce": "^3.1.0",
+		"esbuild": "^0.25.0",
+		"tsx": "^4.19.0",
+		"typescript": "^5.6.0"
+	}
+}
