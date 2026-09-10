@@ -14,6 +14,7 @@ VS Code's built-in encoding switch works on the currently open editor buffer onl
 |---|---|---|
 | **Convert Encoding** | Explorer context menu, Editor title, Command Palette | One click: per-file detection or `convertEncoding.sourceEncoding`, writes `convertEncoding.targetEncoding` |
 | **Convert Encoding with Options…** | Explorer context menu, Command Palette | QuickPick for source (with detected hint) and target; remembers your last target |
+| **Repair Encoding (Fix Garbled Text)** | Explorer context menu, Editor context menu, Command Palette | Proposes scored repairs for garbled files (mojibake reversal + mixed-encoding segmentation); never auto-writes |
 
 - Files (single or multi-select): analyze → convert directly → summary report.
 - Folders (recursive): **mandatory dry-run preview** first — every file shown as `detected source → target` with skip reasons; confirm before anything is written.
@@ -41,6 +42,17 @@ Four deliberately strict defenses ([ADR-0002](docs/adr/0002-data-safety-first.md
 3. [`chardet`](https://github.com/runk/node-chardet) ranked candidates with confidence ≥ threshold, each verified by strict decode — first clean decodable wins.
 
 Below-threshold results skip the file ("low confidence"), they never guess-and-write.
+
+## Repairing garbled files
+
+`Convert Encoding` assumes a file is in ONE encoding. Two real-world cases break that assumption, and the separate **Repair Encoding** command handles them:
+
+- **Mojibake** — the bytes decode cleanly (often as UTF-8) but the *text* is garbage like `锟斤拷`, `Ã©Â¸` or `浣犲ソ`, because the content was misread once and re-saved. Repair reverses it: re-encode the garbled text with the misused codec, then strictly decode with the correct one.
+- **Mixed encodings** — a mostly-UTF-8 file with foreign byte spans spliced in (e.g. GBK comments inside a UTF-8 source file). Repair decodes each non-ASCII run as UTF-8 first, falling back to a CJK codec for runs that are not valid UTF-8 end-to-end.
+
+Repair is heuristic, so it **never auto-writes**: it proposes scored candidates, you pick one, a diff preview (`garbled → repaired`) opens, and only a modal confirmation overwrites the file. A single file gets the full picker; folders and multi-select get a dry-run list using each file's best candidate.
+
+> Repair cannot recover *irreversible* damage. If bytes were already replaced — a full-width `；` (`EF BC 9B`) corrupted to `EF BC 3F`, or text lost to `?`/U+FFFD — no decoding can bring the original back; that is what version control is for. The command then reports "no auto-repairable garbling" instead of guessing. See [ADR-0004](docs/adr/0004-repair-candidates-and-preview.md).
 
 ## Settings
 

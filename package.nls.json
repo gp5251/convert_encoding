@@ -3,6 +3,7 @@
 	"description": "Disk-level batch encoding converter with detection — convert files or folders between any encodings without opening them.",
 	"command.convert.title": "Convert Encoding",
 	"command.convertWithOptions.title": "Convert Encoding with Options…",
+	"command.repair.title": "Repair Encoding (Fix Garbled Text)",
 	"config.sourceEncoding": "Source encoding used by the one-click command: 'auto' detects the encoding per file (BOM → strict UTF-8 validation → ranked detection verified by lossless decode), or an explicit encoding id such as gbk. Explicit ids bypass binary sniffing but are strictly validated.",
 	"config.targetEncoding": "Target encoding for the one-click command. Any iconv-lite id is accepted; the canonical ids utf-8, utf-8-bom, utf-16le, utf-16be fully determine BOM handling.",
 	"config.onUnmappable": "What to do when the target encoding cannot represent a character: fail rejects the file without writing; replace substitutes '?' and warns.",

@@ -29,5 +29,19 @@
 	"Target encoding — how the file is WRITTEN (determines BOM)": "目标编码 —— 决定如何【写】此文件（含 BOM 行为）",
 	"Other… (type an encoding id)": "其他…（输入编码 ID）",
 	"Enter an iconv-lite encoding id": "输入一个 iconv-lite 编码 ID",
-	"Unknown encoding label": "未知编码标签"
+	"Unknown encoding label": "未知编码标签",
+	"{0} text that was misread as {1}": "被当作 {1} 误读的 {0} 文本",
+	"{0} body with {1} foreign {2} span(s)": "{0} 主体，含 {1} 段外来 {2} 片段",
+	"No auto-repairable garbling found. The file may already be correct, or the damage may be irreversible.": "未发现可自动修复的乱码。文件可能本就正确，或损坏已不可逆。",
+	"Overwrite": "覆写",
+	"Overwrite {0} with the repaired text, encoded as {1}? This cannot be undone.": "用还原后的文本以 {1} 编码覆写 {0}？此操作不可撤销。",
+	"{0}% plausible": "可信度 {0}%",
+	"Pick a repair — {0} candidate(s), most plausible first": "选择一种修复方案 — 共 {0} 个候选，按可信度排序",
+	"{0}: garbled → repaired": "{0}：乱码 → 还原",
+	"Repaired {0} → {1}": "已修复 {0} → {1}",
+	"Analyzing garbling": "分析乱码中",
+	"No auto-repairable files found in the selection.": "所选内容中未发现可自动修复的文件。",
+	"Confirm the files to repair (best candidate each), Enter to continue": "确认要修复的文件（各取最佳候选），按 Enter 继续",
+	"Repaired {0} file(s) → {1} · {2} failed": "已修复 {0} 个文件 → {1} · {2} 个失败",
+	"Repaired {0} file(s) → {1}": "已修复 {0} 个文件 → {1}"
 }

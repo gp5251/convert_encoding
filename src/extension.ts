@@ -11,6 +11,9 @@ export function activate(context: vscode.ExtensionContext) {
 		vscode.commands.registerCommand(`${PREFIX}.convertWithOptions`, (uri?: vscode.Uri, uris?: vscode.Uri[]) => {
 			void runOptionsCommand(uri, uris, context);
 		}),
+		vscode.commands.registerCommand(`${PREFIX}.repair`, (uri?: vscode.Uri, uris?: vscode.Uri[]) => {
+			void runRepairCommand(uri, uris, context);
+		}),
 	);
 }
 
@@ -73,6 +76,22 @@ async function runOptionsCommand(uri?: vscode.Uri, uris?: vscode.Uri[], context?
 		targetLabel: targetSpec.id,
 		targetSpec,
 	});
+}
+
+async function runRepairCommand(uri?: vscode.Uri, uris?: vscode.Uri[], context?: vscode.ExtensionContext) {
+	const targets = resolveTargetUris(uri, uris);
+	if (targets.length === 0) {
+		vscode.window.showInformationMessage(vscode.l10n.t('Select a file or folder in the Explorer, or open a file first.'));
+		return;
+	}
+	let settings: AppSettings;
+	try {
+		settings = loadSettings();
+	} catch (e) {
+		vscode.window.showErrorMessage(e instanceof Error ? e.message : String(e));
+		return;
+	}
+	await runRepair(targets, settings, context);
 }
 
 /**
@@ -160,4 +179,5 @@ import { PlanItem, analyzeFile, detectHint, dirtyUris, executePlanItems } from '
 import { previewAndConvert } from './preview';
 import { pickSourceEncoding, pickTargetEncoding } from './quickpick';
 import { reportOutcomes } from './report';
+import { runRepair } from './repairFlow';
 import { AppSettings, loadSettings } from './settings';

@@ -2,7 +2,7 @@
 	"name": "convert-encoding",
 	"displayName": "%displayName%",
 	"description": "%description%",
-	"version": "0.2.0",
+	"version": "0.3.0",
 	"publisher": "changeencoding",
 	"engines": {
 		"vscode": "^1.80.0"
@@ -20,6 +20,10 @@
 			{
 				"command": "convertEncoding.convertWithOptions",
 				"title": "%command.convertWithOptions.title%"
+			},
+			{
+				"command": "convertEncoding.repair",
+				"title": "%command.repair.title%"
 			}
 		],
 		"menus": {
@@ -33,6 +37,11 @@
 					"command": "convertEncoding.convertWithOptions",
 					"when": "view == workbench.explorer.fileView",
 					"group": "1_modification@91"
+				},
+				{
+					"command": "convertEncoding.repair",
+					"when": "view == workbench.explorer.fileView",
+					"group": "1_modification@92"
 				}
 			],
 			"editor/context": [
@@ -43,6 +52,10 @@
 				{
 					"command": "convertEncoding.convertWithOptions",
 					"group": "9_cutcopypaste@99"
+				},
+				{
+					"command": "convertEncoding.repair",
+					"group": "9_cutcopypaste@100"
 				}
 			],
 			"editor/title": [
