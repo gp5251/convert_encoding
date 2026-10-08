@@ -2,7 +2,7 @@
 	"name": "convert-encoding",
 	"displayName": "%displayName%",
 	"description": "%description%",
-	"version": "0.3.0",
+	"version": "0.3.1",
 	"publisher": "changeencoding",
 	"engines": {
 		"vscode": "^1.80.0"
@@ -30,17 +30,14 @@
 			"explorer/context": [
 				{
 					"command": "convertEncoding.convert",
-					"when": "view == workbench.explorer.fileView",
 					"group": "1_modification@90"
 				},
 				{
 					"command": "convertEncoding.convertWithOptions",
-					"when": "view == workbench.explorer.fileView",
 					"group": "1_modification@91"
 				},
 				{
 					"command": "convertEncoding.repair",
-					"when": "view == workbench.explorer.fileView",
 					"group": "1_modification@92"
 				}
 			],
