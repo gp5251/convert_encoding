@@ -146,6 +146,7 @@ async function runConversion(targets: readonly vscode.Uri[], settings: AppSettin
 		return;
 	}
 	const dirty = dirtyUris();
+	const cache = new SimCache();
 	let items: PlanItem[] | undefined;
 	try {
 		items = await vscode.window.withProgress<PlanItem[]>(
@@ -158,7 +159,7 @@ async function runConversion(targets: readonly vscode.Uri[], settings: AppSettin
 						throw new vscode.CancellationError();
 					}
 					progress.report({ message: `${i + 1}/${files.length}`, increment });
-					out.push(await analyzeFile(files[i], settings, dirty));
+					out.push(await analyzeFile(files[i], settings, dirty, cache));
 				}
 				return out;
 			},
@@ -199,7 +200,7 @@ async function runConversion(targets: readonly vscode.Uri[], settings: AppSettin
 
 import { displayName } from './encodings';
 import { collectFiles } from './batch';
-import { PlanItem, analyzeFile, detectHint, dirtyUris, executePlanItems } from './pipeline';
+import { PlanItem, SimCache, analyzeFile, detectHint, dirtyUris, executePlanItems } from './pipeline';
 import { previewAndConvert } from './preview';
 import { pickSourceEncoding, pickTargetEncoding } from './quickpick';
 import { reportOutcomes } from './report';

@@ -19,6 +19,12 @@ export type PlanItem =
 			confidence: number;
 			/** Replacements already known from the simulated convert (policy 'replace'). */
 			replacedHint: number;
+			/**
+			 * Simulated output, cached when the run supplies a SimCache with budget.
+			 * executeConvert reuses it if the file is unchanged, skipping the second
+			 * decode/encode pass (P1-4).
+			 */
+			sim?: ConvertSim;
 	  }
 	| { kind: 'already-target'; uri: vscode.Uri; src: EncodingSpec; tgt: EncodingSpec }
 	| { kind: 'skip'; uri: vscode.Uri; reason: SkipReason; detail?: string }
@@ -33,6 +39,30 @@ export type Outcome =
 
 export function dirtyUris(): Set<string> {
 	return new Set(vscode.workspace.textDocuments.filter((d) => d.isDirty).map((d) => d.uri.toString()));
+}
+
+/** A simulated convert output plus the input's freshness key (size + mtime). */
+export interface ConvertSim {
+	readonly out: Uint8Array;
+	readonly size: number;
+	readonly mtime: number;
+}
+
+/**
+ * Budget tracker for cached convert outputs held between analysis and execution.
+ * Over-budget items simply skip the cache and recompute on execute, bounding
+ * memory on huge folder batches while caching the common case (P1-4).
+ */
+export class SimCache {
+	private used = 0;
+	constructor(private readonly budget = 64 * 1024 * 1024) {}
+	reserve(bytes: number): boolean {
+		if (this.used + bytes > this.budget) {
+			return false;
+		}
+		this.used += bytes;
+		return true;
+	}
 }
 
 /** Fresh single-file dirty check, for re-validating immediately before a write. */
@@ -74,7 +104,12 @@ function unmappableDetail(count: number, firstChar: string, firstIndex: number):
  * text is NUL-laden but text). Explicit source mode bypasses the binary
  * guards — declaring the encoding is an informed act.
  */
-export async function analyzeFile(uri: vscode.Uri, settings: AppSettings, dirty: ReadonlySet<string>): Promise<PlanItem> {
+export async function analyzeFile(
+	uri: vscode.Uri,
+	settings: AppSettings,
+	dirty: ReadonlySet<string>,
+	cache?: SimCache,
+): Promise<PlanItem> {
 	if (dirty.has(uri.toString())) {
 		return { kind: 'skip', uri, reason: 'dirty' };
 	}
@@ -82,14 +117,14 @@ export async function analyzeFile(uri: vscode.Uri, settings: AppSettings, dirty:
 	if (autoMode && hasBinaryExtension(uri.path)) {
 		return { kind: 'skip', uri, reason: 'binary' };
 	}
-	let size: number;
+	let stat: vscode.FileStat;
 	try {
-		size = (await vscode.workspace.fs.stat(uri)).size;
+		stat = await vscode.workspace.fs.stat(uri);
 	} catch {
 		return { kind: 'skip', uri, reason: 'read-error' };
 	}
-	if (settings.maxFileSizeBytes > 0 && size > settings.maxFileSizeBytes) {
-		return { kind: 'skip', uri, reason: 'too-large', detail: `${size} bytes` };
+	if (settings.maxFileSizeBytes > 0 && stat.size > settings.maxFileSizeBytes) {
+		return { kind: 'skip', uri, reason: 'too-large', detail: `${stat.size} bytes` };
 	}
 	let bytes: Uint8Array;
 	try {
@@ -127,8 +162,8 @@ export async function analyzeFile(uri: vscode.Uri, settings: AppSettings, dirty:
 		}
 	}
 
-	const sim = convertBytes(bytes, src, settings.targetSpec, settings.onUnmappable);
-	switch (sim.kind) {
+	const res = convertBytes(bytes, src, settings.targetSpec, settings.onUnmappable);
+	switch (res.kind) {
 		case 'noop':
 			return { kind: 'already-target', uri, src, tgt: settings.targetSpec };
 		case 'invalid-source':
@@ -139,19 +174,23 @@ export async function analyzeFile(uri: vscode.Uri, settings: AppSettings, dirty:
 				detail: vscode.l10n.t('Not a valid {0} byte sequence.', displayName(src)),
 			};
 		case 'unmappable':
-			return { kind: 'fail', uri, reason: 'unmappable', detail: unmappableDetail(sim.count, sim.firstChar, sim.firstIndex) };
-		default:
-			return { kind: 'convert', uri, src, tgt: settings.targetSpec, srcVia, confidence, replacedHint: sim.replaced };
+			return { kind: 'fail', uri, reason: 'unmappable', detail: unmappableDetail(res.count, res.firstChar, res.firstIndex) };
+		default: {
+			const sim =
+				cache && cache.reserve(res.bytes.byteLength)
+					? { out: res.bytes, size: stat.size, mtime: stat.mtime }
+					: undefined;
+			return { kind: 'convert', uri, src, tgt: settings.targetSpec, srcVia, confidence, replacedHint: res.replaced, sim };
+		}
 	}
 }
 
 /**
- * Execute a convert plan item: fresh read, convert, write in place.
- * ponytail: the file is read + converted a SECOND time here (analyzeFile already
- * simulated it). The fresh read is deliberate — it re-reads disk so the write
- * reflects the current bytes, not a stale simulation. Ceiling: ~2x CPU per file.
- * Upgrade path: cache simulated output keyed by (uri, mtime, size) and reuse when
- * the re-read is byte-identical, trading a little memory for the second pass.
+ * Execute a convert plan item. When a cached simulation is present and the file
+ * is unchanged (size+mtime), the cached output is written directly; otherwise a
+ * fresh read + convert runs. The fresh-read fallback keeps the write honest to
+ * the current bytes on disk (ADR-0002), while the cache removes the ~2x CPU cost
+ * of converting every file twice (P1-4).
  */
 async function executeConvert(
 	item: Extract<PlanItem, { kind: 'convert' }>,
@@ -160,6 +199,27 @@ async function executeConvert(
 ): Promise<Outcome> {
 	if (dirty.has(item.uri.toString())) {
 		return { kind: 'skipped', uri: item.uri, reason: 'dirty' };
+	}
+	// Fast path (P1-4): reuse the simulated output when the file is unchanged since
+	// analysis, skipping the second decode/encode pass. size+mtime is the freshness
+	// key (the same cheap check build tools use); on any doubt we fall through to a
+	// fresh read + convert.
+	// ponytail ceiling: a same-size edit landing within the filesystem's mtime
+	// resolution could be missed. The analysis→execute window is short and the
+	// single-file path has none. Upgrade path: hash the input bytes instead.
+	if (item.sim) {
+		try {
+			const st = await vscode.workspace.fs.stat(item.uri);
+			if (st.size === item.sim.size && st.mtime === item.sim.mtime) {
+				if (isDirtyNow(item.uri)) {
+					return { kind: 'skipped', uri: item.uri, reason: 'dirty' };
+				}
+				await writeFileAtomic(item.uri, item.sim.out);
+				return { kind: 'converted', uri: item.uri, src: item.src, tgt: item.tgt, replaced: item.replacedHint };
+			}
+		} catch {
+			// stat/write failed: fall through to the full path, which reports precisely
+		}
 	}
 	let bytes: Uint8Array;
 	try {

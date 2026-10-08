@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { displayName } from './encodings';
-import { PlanItem, analyzeFile, dirtyUris, executePlanItems, planItemToOutcome } from './pipeline';
+import { PlanItem, SimCache, analyzeFile, dirtyUris, executePlanItems, planItemToOutcome } from './pipeline';
 import { AppSettings } from './settings';
 import { reportOutcomes, skipReasonText } from './report';
 
@@ -38,6 +38,7 @@ function toPreviewItem(p: PlanItem): PreviewItem {
  */
 export async function previewAndConvert(files: readonly vscode.Uri[], settings: AppSettings): Promise<void> {
 	const dirty = dirtyUris();
+	const cache = new SimCache();
 	let items: PlanItem[] | undefined;
 	try {
 		items = await vscode.window.withProgress<PlanItem[]>(
@@ -50,7 +51,7 @@ export async function previewAndConvert(files: readonly vscode.Uri[], settings: 
 						throw new vscode.CancellationError();
 					}
 					progress.report({ message: `${i + 1}/${files.length}`, increment });
-					out.push(await analyzeFile(files[i], settings, dirty));
+					out.push(await analyzeFile(files[i], settings, dirty, cache));
 				}
 				return out;
 			},
@@ -95,7 +96,18 @@ export async function previewAndConvert(files: readonly vscode.Uri[], settings: 
 		});
 		qp.onDidAccept(() => {
 			settled = true;
-			resolve(qp.selectedItems.filter((i) => i.plan.kind === 'convert').map((i) => i.plan));
+			const chosen = qp.selectedItems;
+			const plans = chosen.filter((i) => i.plan.kind === 'convert').map((i) => i.plan);
+			// UX-2: the list also shows skipped/failed/already-target rows; if the user
+			// ticked any of those they cannot be converted, so say so instead of
+			// dropping them silently.
+			const dropped = chosen.length - plans.length;
+			if (dropped > 0) {
+				void vscode.window.showInformationMessage(
+					vscode.l10n.t('{0} non-convertible file(s) in the selection were ignored.', String(dropped)),
+				);
+			}
+			resolve(plans);
 		});
 		qp.onDidHide(() => {
 			if (!settled) {

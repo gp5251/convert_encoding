@@ -25,6 +25,7 @@
 	"Converting files": "正在转换文件",
 	"Scanning folders": "扫描文件夹中",
 	"Confirm the files to convert, Enter to start": "勾选要转换的文件，按 Enter 开始",
+	"{0} non-convertible file(s) in the selection were ignored.": "选择中有 {0} 个不可转换的文件已忽略。",
 	"Select / deselect all": "全选 / 全不选",
 	"Auto (detected: {0} · {1}%)": "自动（探测结果：{0} · {1}%）",
 	"Auto (detect per file)": "自动（逐文件探测）",
