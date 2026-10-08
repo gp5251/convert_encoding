@@ -87,12 +87,15 @@ export async function previewAndConvert(files: readonly vscode.Uri[], settings: 
 	qp.items = [...convertible.map(toPreviewItem), ...rest.map(toPreviewItem)];
 	qp.show();
 
-	let allToggled = true;
 	const selected = await new Promise<readonly PlanItem[] | undefined>((resolve) => {
 		let settled = false;
 		qp.onDidTriggerButton(() => {
-			allToggled = !allToggled;
-			qp.items = qp.items.map((i) => (i.plan.kind === 'convert' ? { ...i, picked: allToggled } : i));
+			// Derive the next state from the ACTUAL selection, not a cached flag: a
+			// stale flag (initial `picked` vs. reality, or manual per-row edits between
+			// clicks) made the first click a no-op or do the opposite.
+			const convertItems = qp.items.filter((i) => i.plan.kind === 'convert');
+			const allSelected = convertItems.every((i) => qp.selectedItems.includes(i));
+			qp.selectedItems = allSelected ? [] : convertItems;
 		});
 		qp.onDidAccept(() => {
 			settled = true;
