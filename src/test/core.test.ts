@@ -8,6 +8,7 @@ import { hasBinaryExtension, looksBinary } from '../binary';
 import { detectEncoding } from '../detect';
 import { convertBytes } from '../convert';
 import { CURATED_ENCODINGS, parseEncodingLabel, displayName, EncodingSpec } from '../encodings';
+import { isExcludedPath } from '../util';
 
 const CHINESE = '你好世界，这是一段用于编码转换测试的中文文本。包含标点、English words、数字 12345 以及混合内容，长度足够让编码探测器给出高置信度。';
 
@@ -46,6 +47,25 @@ test('every curated encoding round-trips through parseEncodingLabel', () => {
 		assert.deepEqual(parseEncodingLabel(e.id), e, e.id);
 		assert.ok(displayName(e).length > 0);
 	}
+});
+
+test('every curated codec is registered in iconv-lite (bundle table sanity)', () => {
+	// Guards against a bundled build that dropped an encoding table: each codec
+	// the QuickPick offers must actually resolve.
+	for (const e of CURATED_ENCODINGS) {
+		assert.ok(iconv.encodingExists(e.codec), `${e.id} -> ${e.codec} missing from iconv-lite`);
+	}
+});
+
+// ---------- batch excludes ----------
+
+test('isExcludedPath prunes matched paths and keeps the rest', () => {
+	const excludes = ['**/node_modules/**', '**/.git/**'];
+	assert.equal(isExcludedPath('a/node_modules/b.js', excludes), true);
+	assert.equal(isExcludedPath('deep/nested/node_modules/x/y.ts', excludes), true);
+	assert.equal(isExcludedPath('src/.git/config', excludes), true);
+	assert.equal(isExcludedPath('src/app.ts', excludes), false);
+	assert.equal(isExcludedPath('a/b.js', []), false);
 });
 
 // ---------- BOM ----------

@@ -4,7 +4,7 @@ import { proposeRepairs, RepairCandidate } from './repair';
 import { EncodingSpec, displayName } from './encodings';
 import { hasBinaryExtension, looksBinary } from './binary';
 import { collectFiles } from './batch';
-import { dirtyUris } from './pipeline';
+import { dirtyUris, writeFileAtomic } from './pipeline';
 import { pickTargetEncoding } from './quickpick';
 import { AppSettings } from './settings';
 import { toBuffer } from './util';
@@ -133,7 +133,17 @@ async function repairSingle(uri: vscode.Uri, settings: AppSettings, context?: vs
 		vscode.window.showWarningMessage(guard.message);
 		return;
 	}
-	const candidates = proposeRepairs(guard.bytes);
+	const candidates = await vscode.window.withProgress(
+		{ location: vscode.ProgressLocation.Window, title: vscode.l10n.t('Analyzing garbling') },
+		async () => {
+			// Yield once so the spinner paints before the synchronous candidate scan
+			// blocks the extension host. ponytail: the scan itself is still one
+			// uninterruptible burst; the upgrade path is an async proposeRepairs that
+			// yields between candidates (see ADR-0004).
+			await new Promise<void>((resolve) => setImmediate(resolve));
+			return proposeRepairs(guard.bytes);
+		},
+	);
 	if (candidates.length === 0) {
 		vscode.window.showInformationMessage(noRepairMessage());
 		return;
@@ -157,6 +167,8 @@ async function repairSingle(uri: vscode.Uri, settings: AppSettings, context?: vs
 		{ modal: true },
 		overwrite,
 	);
+	// Close the read-only diff tab regardless of the decision.
+	await closeDiffTab();
 	if (choice !== overwrite) {
 		return;
 	}
@@ -204,10 +216,19 @@ async function showRepairDiff(uri: vscode.Uri, bytes: Uint8Array, candidate: Rep
 	await vscode.commands.executeCommand('vscode.diff', left.uri, right.uri, title);
 }
 
+/** Best-effort close of the read-only diff tab opened by showRepairDiff. */
+async function closeDiffTab(): Promise<void> {
+	try {
+		await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+	} catch {
+		// the tab may already be gone; nothing to clean up
+	}
+}
+
 async function writeRepair(uri: vscode.Uri, text: string, target: EncodingSpec): Promise<void> {
 	const out = iconv.encode(text, target.codec, { addBOM: target.bom });
 	try {
-		await vscode.workspace.fs.writeFile(uri, out);
+		await writeFileAtomic(uri, out);
 		vscode.window.showInformationMessage(
 			vscode.l10n.t('Repaired {0} → {1}', vscode.workspace.asRelativePath(uri, false), displayName(target)),
 		);
@@ -319,7 +340,7 @@ async function repairBatch(files: readonly vscode.Uri[], settings: AppSettings, 
 		}
 		try {
 			const out = iconv.encode(row.candidate!.text, target.codec, { addBOM: target.bom });
-			await vscode.workspace.fs.writeFile(row.uri, out);
+			await writeFileAtomic(row.uri, out);
 			done++;
 		} catch {
 			failed++;

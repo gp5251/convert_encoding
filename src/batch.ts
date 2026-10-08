@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { minimatch } from 'minimatch';
+import { isExcludedPath } from './util';
 
 /**
  * Recursively collect files under `root`, pruning excluded directories.
@@ -49,9 +49,4 @@ async function walk(
 			}
 		}
 	}
-}
-
-/** Glob match against the path relative to the scan root, posix separators. */
-function isExcludedPath(rel: string, excludes: readonly string[]): boolean {
-	return excludes.some((p) => p.length > 0 && (minimatch(rel, p) || minimatch(rel + '/**', p)));
 }

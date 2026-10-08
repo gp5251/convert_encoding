@@ -11,8 +11,16 @@ interface PreviewItem extends vscode.QuickPickItem {
 function toPreviewItem(p: PlanItem): PreviewItem {
 	const rel = vscode.workspace.asRelativePath(p.uri, false);
 	switch (p.kind) {
-		case 'convert':
-			return { label: rel, description: `${displayName(p.src)} → ${displayName(p.tgt)}`, plan: p, picked: true };
+		case 'convert': {
+			const lossy =
+				p.replacedHint > 0 ? `  $(warning) ${vscode.l10n.t('{0} char(s) → ?', String(p.replacedHint))}` : '';
+			return {
+				label: rel,
+				description: `${displayName(p.src)} → ${displayName(p.tgt)}${lossy}`,
+				plan: p,
+				picked: true,
+			};
+		}
 		case 'already-target':
 			return { label: `$(check) ${rel}`, description: vscode.l10n.t('already {0}', displayName(p.tgt)), plan: p };
 		case 'skip':

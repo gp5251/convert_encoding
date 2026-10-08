@@ -46,6 +46,6 @@ export function loadSettings(): AppSettings {
 		onUnmappable: cfg.get<string>('onUnmappable') === 'replace' ? 'replace' : 'fail',
 		batchExcludes: cfg.get<string[]>('batchExcludes') ?? [],
 		maxFileSizeBytes: Math.max(0, maxMB) * 1024 * 1024,
-		confidenceThreshold: Math.min(100, Math.max(0, cfg.get<number>('detectionConfidenceThreshold') ?? 90)),
+		confidenceThreshold: Math.min(100, Math.max(0, cfg.get<number>('detectionConfidenceThreshold') ?? 80)),
 	};
 }

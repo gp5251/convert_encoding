@@ -218,6 +218,12 @@ function segmentedDecode(bytes: Uint8Array, segCodec: string): { text: string; s
  * source text is made of; penalises U+FFFD, control bytes, the private-use
  * area, and the Latin-ext / Cyrillic / Hebrew code points that mojibake and
  * half-decoded GBK typically surface (e.g. U+013C 'ļ', U+05E2 'ע', U+0461 'ѡ').
+ *
+ * ponytail: the heuristic is deliberately CJK-centric (ADR-0004). Scripts whose
+ * legitimate text lives outside ASCII + the CJK blocks (accented Latin, Cyrillic,
+ * Greek, …) score every real char as 'bad', so repair ranking is unreliable for
+ * them. Ceiling: non-CJK garbling may be mis-scored or filtered out. Upgrade
+ * path: a script-aware scorer that rewards the expected Unicode blocks per locale.
  */
 function scoreText(text: string): number {
 	let good = 0;

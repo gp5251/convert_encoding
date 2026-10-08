@@ -35,6 +35,32 @@ export function dirtyUris(): Set<string> {
 	return new Set(vscode.workspace.textDocuments.filter((d) => d.isDirty).map((d) => d.uri.toString()));
 }
 
+/** Fresh single-file dirty check, for re-validating immediately before a write. */
+function isDirtyNow(uri: vscode.Uri): boolean {
+	const s = uri.toString();
+	return vscode.workspace.textDocuments.some((d) => d.isDirty && d.uri.toString() === s);
+}
+
+/**
+ * Atomic in-place write (ADR-0002): write a sibling temp file, then rename over
+ * the target. A crash / full disk mid-write leaves the ORIGINAL file intact
+ * rather than truncated. On failure the temp file is best-effort removed.
+ */
+export async function writeFileAtomic(uri: vscode.Uri, bytes: Uint8Array): Promise<void> {
+	const tmp = uri.with({ path: `${uri.path}.${process.pid}.${Date.now()}.tmp` });
+	try {
+		await vscode.workspace.fs.writeFile(tmp, bytes);
+		await vscode.workspace.fs.rename(tmp, uri, { overwrite: true });
+	} catch (e) {
+		try {
+			await vscode.workspace.fs.delete(tmp);
+		} catch {
+			// best effort: the temp file may never have been created
+		}
+		throw e;
+	}
+}
+
 function unmappableDetail(count: number, firstChar: string, firstIndex: number): string {
 	const cp = firstChar.codePointAt(0)?.toString(16).toUpperCase() ?? '?';
 	return vscode.l10n.t('{0} unmappable character(s); first: U+{1} at char {2}.', String(count), cp, String(firstIndex));
@@ -119,7 +145,14 @@ export async function analyzeFile(uri: vscode.Uri, settings: AppSettings, dirty:
 	}
 }
 
-/** Execute a convert plan item: fresh read, convert, write in place. */
+/**
+ * Execute a convert plan item: fresh read, convert, write in place.
+ * ponytail: the file is read + converted a SECOND time here (analyzeFile already
+ * simulated it). The fresh read is deliberate — it re-reads disk so the write
+ * reflects the current bytes, not a stale simulation. Ceiling: ~2x CPU per file.
+ * Upgrade path: cache simulated output keyed by (uri, mtime, size) and reuse when
+ * the re-read is byte-identical, trading a little memory for the second pass.
+ */
 async function executeConvert(
 	item: Extract<PlanItem, { kind: 'convert' }>,
 	settings: AppSettings,
@@ -148,8 +181,13 @@ async function executeConvert(
 		case 'unmappable':
 			return { kind: 'failed', uri: item.uri, reason: 'unmappable', detail: unmappableDetail(r.count, r.firstChar, r.firstIndex) };
 		default:
+			// Re-check dirty immediately before the destructive write: the file may
+			// have been edited while the batch was running (ADR-0002 first line).
+			if (isDirtyNow(item.uri)) {
+				return { kind: 'skipped', uri: item.uri, reason: 'dirty' };
+			}
 			try {
-				await vscode.workspace.fs.writeFile(item.uri, r.bytes);
+				await writeFileAtomic(item.uri, r.bytes);
 				return { kind: 'converted', uri: item.uri, src: item.src, tgt: item.tgt, replaced: r.replaced };
 			} catch (e) {
 				return { kind: 'failed', uri: item.uri, reason: 'write-error', detail: e instanceof Error ? e.message : String(e) };

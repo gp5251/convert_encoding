@@ -2,6 +2,7 @@ import { EncodingSpec, parseEncodingLabel } from './encodings';
 import { sniffBom } from './bom';
 import { analyse } from 'chardet';
 import { strictDecode } from './strict';
+import { toBuffer } from './util';
 
 export type DetectionVia = 'bom' | 'utf8' | 'detector';
 
@@ -27,7 +28,7 @@ export function detectEncoding(bytes: Uint8Array, threshold: number): DetectionO
 	if (strictDecode(bytes, 'utf-8') !== undefined) {
 		return { kind: 'ok', spec: UTF8, confidence: 100, via: 'utf8' };
 	}
-	const matches = analyse(bytes);
+	const matches = analyse(toBuffer(bytes));
 	for (const m of matches) {
 		if (m.confidence < threshold) {
 			continue;

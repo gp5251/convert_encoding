@@ -139,6 +139,12 @@ async function runConversion(targets: readonly vscode.Uri[], settings: AppSettin
 	if (files.length === 0) {
 		return;
 	}
+	// More than one plain file is a batch too: route it through the same
+	// mandatory dry-run preview a folder gets, so nothing is overwritten blind.
+	if (files.length > 1) {
+		await previewAndConvert(files, settings);
+		return;
+	}
 	const dirty = dirtyUris();
 	let items: PlanItem[] | undefined;
 	try {
@@ -162,6 +168,24 @@ async function runConversion(targets: readonly vscode.Uri[], settings: AppSettin
 	}
 	if (!items) {
 		return; // user cancelled analysis
+	}
+	// A lossy (replace-policy) single-file convert destroys characters with no
+	// undo: confirm before writing rather than only reporting afterwards.
+	const lossy = items.find((i): i is Extract<PlanItem, { kind: 'convert' }> => i.kind === 'convert' && i.replacedHint > 0);
+	if (lossy) {
+		const proceed = vscode.l10n.t('Convert anyway');
+		const choice = await vscode.window.showWarningMessage(
+			vscode.l10n.t(
+				'{0} character(s) cannot be represented in {1} and will be replaced with "?". This cannot be undone. Continue?',
+				String(lossy.replacedHint),
+				displayName(settings.targetSpec),
+			),
+			{ modal: true },
+			proceed,
+		);
+		if (choice !== proceed) {
+			return;
+		}
 	}
 	const outcomes = await vscode.window.withProgress(
 		{ location: vscode.ProgressLocation.Window, cancellable: true, title: vscode.l10n.t('Converting files') },

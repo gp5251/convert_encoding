@@ -107,7 +107,7 @@
 				},
 				"convertEncoding.detectionConfidenceThreshold": {
 					"type": "number",
-					"default": 90,
+					"default": 80,
 					"minimum": 0,
 					"maximum": 100,
 					"markdownDescription": "%config.detectionConfidenceThreshold%"
